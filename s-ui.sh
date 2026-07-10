@@ -91,7 +91,7 @@ before_show_menu() {
 }
 
 install() {
-    bash <(curl -Ls "$(gh_url "https://raw.githubusercontent.com/hxzlplp7/s-ui/main/install.sh")")
+    bash <(curl -Ls "$(gh_url "https://raw.githubusercontent.com/hxzl666/serv00-sui/main/install.sh")")
     if [[ $? == 0 ]]; then
         if [[ $# == 0 ]]; then
             start
@@ -110,7 +110,7 @@ update() {
         fi
         return 0
     fi
-    bash <(curl -Ls "$(gh_url "https://raw.githubusercontent.com/hxzlplp7/s-ui/main/install.sh")")
+    bash <(curl -Ls "$(gh_url "https://raw.githubusercontent.com/hxzl666/serv00-sui/main/install.sh")")
     if [[ $? == 0 ]]; then
         LOGI "更新完成，面板已自动重启。"
         exit 0
@@ -126,7 +126,7 @@ custom_version() {
     exit 1
     fi
 
-    download_link="$(gh_url "https://raw.githubusercontent.com/hxzlplp7/s-ui/main/install.sh")"
+    download_link="$(gh_url "https://raw.githubusercontent.com/hxzl666/serv00-sui/main/install.sh")"
 
     install_command="bash <(curl -Ls $download_link) $panel_version"
 
@@ -362,7 +362,7 @@ show_log() {
 }
 
 update_shell() {
-    wget -O ${BIN_DIR}/s-ui -N --no-check-certificate "$(gh_url "https://raw.githubusercontent.com/hxzlplp7/s-ui/main/s-ui.sh")"
+    wget -O ${BIN_DIR}/s-ui -N --no-check-certificate "$(gh_url "https://raw.githubusercontent.com/hxzl666/serv00-sui/main/s-ui.sh")"
     if [[ $? != 0 ]]; then
         echo ""
         LOGE "下载脚本失败，请检查机器是否可访问 GitHub。"
