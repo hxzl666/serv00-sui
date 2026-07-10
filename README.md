@@ -1,275 +1,87 @@
-# S-UI
-**高级 Web 面板 • 基于 SagerNet/Sing-Box 构建**
+# S-UI FreeBSD (Serv00/Hostuno) 适配分支
 
-![](https://img.shields.io/github/v/release/alireza0/s-ui.svg)
-![S-UI Docker pull](https://img.shields.io/docker/pulls/alireza7/s-ui.svg)
-[![Go Report Card](https://goreportcard.com/badge/github.com/alireza0/s-ui)](https://goreportcard.com/report/github.com/alireza0/s-ui)
-[![Downloads](https://img.shields.io/github/downloads/alireza0/s-ui/total.svg)](https://img.shields.io/github/downloads/alireza0/s-ui/total.svg)
-[![License](https://img.shields.io/badge/license-GPL%20V3-blue.svg?longCache=true)](https://www.gnu.org/licenses/gpl-3.0.en.html)
+S-UI 是一款基于 **SagerNet/Sing-Box** 构建的高级 Web 管理面板。本分支专为 **FreeBSD 平台**（特别是 **Serv00** 与 **Hostuno** 虚拟主机）进行了深度适配，支持在**非 root 权限**下进行一键现场编译、安装、面板控制以及进程定时保活守护。
 
-> **免责声明：** 本项目仅用于个人学习与交流，请勿用于非法用途，也请勿在生产环境中直接使用。
+---
 
-**如果你觉得这个项目对你有帮助，欢迎点一个** :star2:
+## 🌟 核心适配特性
 
-**想参与贡献？** 请查看 [CONTRIBUTING.md](CONTRIBUTING.md)，其中包含开发环境、编码规范、测试与 PR 流程。
+* **免 Root 安装**：自适应非 root 环境，将所有数据及二进制安装至用户家目录（`~/s-ui`）。
+* **零配置现场编译**：如果服务器没有 Go 语言环境，脚本会自动在临时目录部署 Go 编译器，编译完成后自动清理，实现零依赖一键构建。
+* **前端静态资源嵌入**：预打包前端网页代码，在 Go 编译阶段直接嵌入二进制内部，避免在虚拟主机上运行 npm 构建导致内存溢出（OOM）。
+* **服务器 3 入口智能识别**：自动根据机器 hostname 提取并生成 Serv00 节点的 3 个可用网络入口域名（主域名、Web 备用域名、管理面板域名），并在安装成功时直观展示访问地址。
+* **定时保活自动守护**：内置去重写入技术，自动将进程检测与拉起任务注册到系统 Crontab 中，实现服务每分钟自动保活及开机自动拉起。
+* **自适应控制菜单**：重写了原版脚本中对 Linux systemd 的硬编码依赖，在 FreeBSD 下全面适配为基于 `pgrep` 和 `pkill` 的纯原生控制逻辑。
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/alireza7)
+---
 
-<a href="https://nowpayments.io/donation/alireza7" target="_blank" rel="noreferrer noopener">
-   <img src="https://nowpayments.io/images/embeds/donation-button-white.svg" alt="Crypto donation button by NOWPayments">
-</a>
+## 🛠️ 安装与部署步骤
 
-## 快速概览
-| 功能 | 是否支持 |
-| -------------------------------------- | :----------------: |
-| 多协议 | :heavy_check_mark: |
-| 多语言 | :heavy_check_mark: |
-| 多客户端/多入站 | :heavy_check_mark: |
-| 高级流量路由界面 | :heavy_check_mark: |
-| 客户端/流量/系统状态监控 | :heavy_check_mark: |
-| 订阅链接（link/json/clash + info） | :heavy_check_mark: |
-| 深色/浅色主题 | :heavy_check_mark: |
-| API 接口 | :heavy_check_mark: |
-
-## 支持平台
-| 平台 | 架构 | 状态 |
-|----------|--------------|---------|
-| Linux    | amd64, arm64, armv7, armv6, armv5, 386, s390x | ✅ 已支持 |
-| Windows  | amd64, 386, arm64 | ✅ 已支持 |
-| macOS    | amd64, arm64 | 🚧 实验性支持 |
-
-## 截图
-
-!["Main"](https://github.com/alireza0/s-ui-frontend/raw/main/media/main.png)
-
-[更多界面截图](https://github.com/alireza0/s-ui-frontend/blob/main/screenshots.md)
-
-## API 文档
-
-[API-Documentation Wiki](https://github.com/alireza0/s-ui/wiki/API-Documentation)
-
-## 默认安装信息
-- 面板端口：2095
-- 面板路径：/app/
-- 订阅端口：2096
-- 订阅路径：/sub/
-- 用户名/密码：admin
-
-## 安装与升级到最新版本
-
-### Linux/macOS
-```sh
-bash <(curl -Ls https://raw.githubusercontent.com/alireza0/s-ui/master/install.sh)
-```
-
-国内网络可使用镜像源（通过环境变量 `SUI_GITHUB_PROXY`）：
-
-```sh
-SUI_GITHUB_PROXY="https://ghfast.top/" bash <(curl -Ls https://ghfast.top/https://raw.githubusercontent.com/alireza0/s-ui/master/install.sh)
-```
-
-说明：
-- `SUI_GITHUB_PROXY` 会同时用于 `install.sh` 和 `s-ui.sh` 内部的 GitHub 下载地址（如 release 包、raw 脚本）。
-- 如 `ghfast.top` 不可用，可替换为其他兼容前缀，例如 `https://ghproxy.com/`。
-
-### Windows
-1. 从 [GitHub Releases](https://github.com/alireza0/s-ui/releases/latest) 下载最新 Windows 版本
-2. 解压 ZIP 文件
-3. 以管理员身份运行 `install-windows.bat`
-4. 按安装向导完成安装
-
-## 安装旧版本
-
-**步骤 1：** 在安装命令末尾追加版本号即可安装指定旧版本，例如 `1.0.0`：
-
-```sh
-VERSION=1.0.0 && bash <(curl -Ls https://raw.githubusercontent.com/alireza0/s-ui/$VERSION/install.sh) $VERSION
-```
-
-国内镜像源示例：
-
-```sh
-VERSION=1.0.0 && SUI_GITHUB_PROXY="https://ghfast.top/" bash <(curl -Ls https://ghfast.top/https://raw.githubusercontent.com/alireza0/s-ui/$VERSION/install.sh) $VERSION
-```
-
-## 手动安装
-
-### Linux/macOS
-1. 在 GitHub 获取与你系统/架构匹配的最新版 S-UI：[https://github.com/alireza0/s-ui/releases/latest](https://github.com/alireza0/s-ui/releases/latest)
-2. **可选**：获取最新 `s-ui.sh`：[https://raw.githubusercontent.com/alireza0/s-ui/master/s-ui.sh](https://raw.githubusercontent.com/alireza0/s-ui/master/s-ui.sh)
-   - 国内镜像链接示例：`https://ghfast.top/https://raw.githubusercontent.com/alireza0/s-ui/master/s-ui.sh`
-3. **可选**：将 `s-ui.sh` 复制到 /usr/bin/ 并执行 `chmod +x /usr/bin/s-ui`
-4. 将 s-ui 的 tar.gz 解压到你选择的目录，并进入解压目录
-5. 将 *.service 文件复制到 /etc/systemd/system/，然后执行 `systemctl daemon-reload`
-6. 执行 `systemctl enable s-ui --now` 启用并启动 S-UI 服务
-7. 执行 `systemctl enable sing-box --now` 启动 sing-box 服务
-
-### Windows
-1. 在 GitHub 获取最新 Windows 版本：[https://github.com/alireza0/s-ui/releases/latest](https://github.com/alireza0/s-ui/releases/latest)
-2. 下载对应架构的 Windows 安装包（例如 `s-ui-windows-amd64.zip`）
-3. 将 ZIP 解压到你选择的目录
-4. 以管理员身份运行 `install-windows.bat`
-5. 按安装向导完成安装
-6. 在 http://localhost:2095/app 访问面板
-
-## 卸载 S-UI
-
-```sh
-sudo -i
-
-systemctl disable s-ui  --now
-
-rm -f /etc/systemd/system/sing-box.service
-systemctl daemon-reload
-
-rm -fr /usr/local/s-ui
-rm /usr/bin/s-ui
-```
-
-## 使用 Docker 安装
-
-<details>
-   <summary>点击展开</summary>
-
-### 用法
-
-**步骤 1：** 安装 Docker
-
-```shell
-curl -fsSL https://get.docker.com | sh
-```
-
-**步骤 2：** 安装 S-UI
-
-> 使用 Docker compose
-
-```shell
-mkdir s-ui && cd s-ui
-wget -q https://raw.githubusercontent.com/alireza0/s-ui/master/docker-compose.yml
-docker compose up -d
-```
-
-> 使用 docker
-
-```shell
-mkdir s-ui && cd s-ui
-docker run -itd \
-    -p 2095:2095 -p 2096:2096 -p 443:443 -p 80:80 \
-    -v $PWD/db/:/app/db/ \
-    -v $PWD/cert/:/root/cert/ \
-    --name s-ui --restart=unless-stopped \
-    alireza7/s-ui:latest
-```
-
-> 自行构建镜像
-
-```shell
-git clone https://github.com/alireza0/s-ui
-git submodule update --init --recursive
-docker build -t s-ui .
-```
-
-</details>
-
-## 手动运行（贡献开发）
-
-<details>
-   <summary>点击展开</summary>
-
-### 构建并运行整个项目
-```shell
-./runSUI.sh
-```
-
-### 克隆仓库
-```shell
-# 克隆主仓库
-git clone https://github.com/alireza0/s-ui
-# 拉取子模块
-git submodule update --init --recursive
-```
-
-### - 前端
-
-前端代码请访问 [s-ui-frontend](https://github.com/alireza0/s-ui-frontend)
-
-### - 后端
-> 请先至少构建一次前端！
-
-构建后端：
-```shell
-# 删除旧的前端编译文件
-rm -fr web/html/*
-# 复制新的前端编译产物
-cp -R frontend/dist/ web/html/
-# 构建
-go build -o sui main.go
-```
-
-运行后端（在仓库根目录）：
-```shell
-./sui
-```
-
-</details>
-
-## 语言
-
-- 英语
-- 波斯语
-- 越南语
-- 中文（简体）
-- 中文（繁体）
-- 俄语
-
-## 功能
-
-- 支持协议：
-  - 通用：Mixed、SOCKS、HTTP、HTTPS、Direct、Redirect、TProxy
-  - 基于 V2Ray：VLESS、VMess、Trojan、Shadowsocks
-  - 其他协议：ShadowTLS、Hysteria、Hysteria2、Naive、TUIC
-- 支持 XTLS 协议
-- 高级流量路由配置界面，支持 PROXY Protocol、External、Transparent Proxy、SSL 证书与端口配置
-- 高级入站/出站配置界面
-- 客户端流量限额与到期时间管理
-- 展示在线客户端、入站/出站流量统计与系统状态监控
-- 订阅服务支持添加外部链接与订阅
-- 支持 HTTPS 安全访问面板与订阅服务（需自备域名与 SSL 证书）
-- 深色/浅色主题
-
-## 环境变量
-
-<details>
-  <summary>点击展开</summary>
-
-### 用法
-
-| 变量 | 类型 | 默认值 |
-| -------------- | :--------------------------------------------: | :------------ |
-| SUI_LOG_LEVEL  | `"debug"` \| `"info"` \| `"warn"` \| `"error"` | `"info"` |
-| SUI_DEBUG      | `boolean` | `false` |
-| SUI_BIN_FOLDER | `string` | `"bin"` |
-| SUI_DB_FOLDER  | `string` | `"db"` |
-| SINGBOX_API    | `string` | - |
-
-</details>
-
-## SSL 证书
-
-<details>
-  <summary>点击展开</summary>
-
-### Certbot
+### 步骤 1：本地前端构建（只需执行一次）
+S-UI 的 Web 页面是在编译时直接打包进后端二进制中的。由于虚拟主机资源极其有限，请先在您的本地环境（有 Node.js 和 npm 环境的 Windows/Mac）中生成前端静态文件：
 
 ```bash
-snap install core; snap refresh core
-snap install --classic certbot
-ln -s /snap/bin/certbot /usr/bin/certbot
+# 1. 拉取前端子模块源码
+git submodule update --init --recursive
 
-certbot certonly --standalone --register-unsafely-without-email --non-interactive --agree-tos -d <Your Domain Name>
+# 2. 进入前端目录安装依赖并构建
+cd frontend
+npm install
+npm run build
+cd ..
+
+# 3. 复制前端编译产物到 web/html 供 Go 编译器读取
+mkdir -p web/html
+cp -R frontend/dist/* web/html/
 ```
 
-</details>
+### 步骤 2：上传代码至虚拟主机
+将本地的整个项目文件夹（已包含 `web/html` 目录）上传至您的 Serv00 / Hostuno 服务器空间（例如上传至 `~/s-ui-src` 目录）。
 
-## Stargazers over Time
-[![Stargazers over time](https://starchart.cc/alireza0/s-ui.svg)](https://starchart.cc/alireza0/s-ui)
+### 步骤 3：运行安装脚本
+通过 SSH 登录到您的虚拟主机，进入您上传的源码目录，执行：
+
+```bash
+bash install.sh
+```
+
+**在安装过程中，您需要：**
+1. 输入您在服务商后台（如 DevilWEB）提前申请并放行的**面板访问端口**。
+2. 输入您申请的**订阅服务端口**。
+3. 设置您的管理员账号和密码（默认均为 `admin`）。
+
+安装完成后，脚本会输出以下格式的访问指南，展示您的 **3 个域名入口** 的面板访问地址：
+* **主域名入口 (首选)**: `http://sXX.serv00.com:面板端口/app/`
+* **Web 备用域名**: `http://webXX.serv00.com:面板端口/app/`
+* **管理面板域名**: `http://panelXX.serv00.com:面板端口/app/`
+
+---
+
+## ⌨️ 命令行控制菜单
+
+安装完成后，脚本已在您的家目录下配置了控制快捷方式。您可以在终端中直接输入 `s-ui` 调出交互式图形管理菜单：
+
+```bash
+s-ui
+```
+
+### 快捷控制指令
+
+| 指令 | 说明 |
+| :--- | :--- |
+| `s-ui start` | 启动 S-UI 服务 |
+| `s-ui stop` | 停止 S-UI 服务 |
+| `s-ui restart` | 重启 S-UI 服务 |
+| `s-ui status` | 查看服务当前的运行状态 (PID) |
+| `s-ui log` | 查看并追踪面板运行日志 |
+| `s-ui enable` | 开启 Crontab 每分钟定时自启动保活 |
+| `s-ui disable` | 关闭 Crontab 定时保活 |
+| `s-ui uninstall` | 彻底卸载面板并删除所有配置数据 |
+
+---
+
+## 💡 注意事项
+
+1. **端口放行**：Serv00/Hostuno 运行的应用必须监听在您名下申请过的端口（Port Reservation），**请勿使用未被分配的端口**，否则服务将无法正常监听和连通。
+2. **应用权限**：运行前请确保在 DevilWEB 控制面板的 `Additional services` -> `Run your own applications` 菜单中将权限设置为 `Enabled`。
+3. **节点配置**：在使用本面板创建 sing-box 节点入站时，请同样使用您申请并空闲的端口。

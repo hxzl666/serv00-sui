@@ -31,7 +31,21 @@ function LOGI() {
     echo -e "${green}[INF] $* ${plain}"
 }
 
-[[ $EUID -ne 0 ]] && LOGE "错误：必须使用 root 权限运行此脚本！\n" && exit 1
+is_freebsd=0
+uname_output=$(uname -a)
+if echo "$uname_output" | grep -Eqi "freebsd"; then
+    is_freebsd=1
+fi
+
+if [ $is_freebsd -eq 1 ]; then
+    INSTALL_DIR="$HOME/s-ui"
+    BIN_DIR="$HOME/.local/bin"
+else
+    INSTALL_DIR="/usr/local/s-ui"
+    BIN_DIR="/usr/bin"
+    # Linux 环境依然需要 root 权限
+    [[ $EUID -ne 0 ]] && LOGE "错误：必须使用 root 权限运行此脚本！\n" && exit 1
+fi
 
 if [[ -f /etc/os-release ]]; then
     source /etc/os-release
@@ -133,11 +147,11 @@ uninstall() {
     rm /etc/systemd/system/s-ui.service -f
     systemctl daemon-reload
     systemctl reset-failed
-    rm /etc/s-ui/ -rf
-    rm /usr/local/s-ui/ -rf
+    rm ${INSTALL_DIR}/config/ -rf
+    rm ${INSTALL_DIR}/ -rf
 
     echo ""
-    echo -e "卸载成功。如需删除本脚本，退出后执行 ${green}rm /usr/local/s-ui -f${plain}。"
+    echo -e "卸载成功。如需删除本脚本，退出后执行 ${green}rm ${INSTALL_DIR} -f${plain}。"
     echo ""
 
     if [[ $# == 0 ]]; then
@@ -149,7 +163,7 @@ reset_admin() {
     echo "不建议将管理员账号恢复为默认值。"
     confirm "确定要将管理员账号重置为默认值吗？" "n"
     if [[ $? == 0 ]]; then
-        /usr/local/s-ui/sui admin -reset
+        ${INSTALL_DIR}/sui admin -reset
     fi
     before_show_menu
 }
@@ -158,19 +172,19 @@ set_admin() {
     echo "建议使用易记但安全的管理员账号密码。"
     read -p "请设置用户名：" config_account
     read -p "请设置密码：" config_password
-    /usr/local/s-ui/sui admin -username ${config_account} -password ${config_password}
+    ${INSTALL_DIR}/sui admin -username ${config_account} -password ${config_password}
     before_show_menu
 }
 
 view_admin() {
-    /usr/local/s-ui/sui admin -show
+    ${INSTALL_DIR}/sui admin -show
     before_show_menu
 }
 
 reset_setting() {
     confirm "确定要将面板设置重置为默认值吗？" "n"
     if [[ $? == 0 ]]; then
-        /usr/local/s-ui/sui setting -reset
+        ${INSTALL_DIR}/sui setting -reset
     fi
     before_show_menu
 }
@@ -192,18 +206,18 @@ set_setting() {
     [ -z "$config_path" ] || params="$params -path $config_path"
     [ -z "$config_subPort" ] || params="$params -subPort $config_subPort"
     [ -z "$config_subPath" ] || params="$params -subPath $config_subPath"
-    /usr/local/s-ui/sui setting ${params}
+    ${INSTALL_DIR}/sui setting ${params}
     before_show_menu
 }
 
 view_setting() {
-    /usr/local/s-ui/sui setting -show
+    ${INSTALL_DIR}/sui setting -show
     view_uri
     before_show_menu
 }
 
 view_uri() {
-    info=$(/usr/local/s-ui/sui uri)
+    info=$(${INSTALL_DIR}/sui uri)
     if [[ $? != 0 ]]; then
         LOGE "获取当前访问地址失败"
         before_show_menu
@@ -218,13 +232,19 @@ start() {
         echo ""
         LOGI -e "${1} 正在运行，无需重复启动；如需重启，请选择 restart。"
     else
-        systemctl start $1
-        sleep 2
+        if [ $is_freebsd -eq 1 ]; then
+            cd "${INSTALL_DIR}"
+            nohup ./sui > sui.log 2>&1 &
+            sleep 2
+        else
+            systemctl start $1
+            sleep 2
+        fi
         check_status $1
         if [[ $? == 0 ]]; then
             LOGI "${1} 启动成功"
         else
-            LOGE "${1} 启动失败，可能启动超过 2 秒，请稍后查看日志。"
+            LOGE "${1} 启动失败，请稍后查看日志。"
         fi
     fi
 
@@ -239,13 +259,18 @@ stop() {
         echo ""
         LOGI "${1} 已停止，无需重复停止。"
     else
-        systemctl stop $1
-        sleep 2
-        check_status
+        if [ $is_freebsd -eq 1 ]; then
+            pkill -f "${INSTALL_DIR}/sui"
+            sleep 2
+        else
+            systemctl stop $1
+            sleep 2
+        fi
+        check_status $1
         if [[ $? == 1 ]]; then
             LOGI "${1} 停止成功"
         else
-            LOGE "${1} 停止失败，可能停止超过 2 秒，请稍后查看日志。"
+            LOGE "${1} 停止失败，请稍后查看日志。"
         fi
     fi
 
@@ -255,13 +280,18 @@ stop() {
 }
 
 restart() {
-    systemctl restart $1
-    sleep 2
-    check_status $1
-    if [[ $? == 0 ]]; then
-        LOGI "${1} 重启成功"
+    if [ $is_freebsd -eq 1 ]; then
+        stop $1 0
+        start $1 0
     else
-        LOGE "${1} 重启失败，可能启动超过 2 秒，请稍后查看日志。"
+        systemctl restart $1
+        sleep 2
+        check_status $1
+        if [[ $? == 0 ]]; then
+            LOGI "${1} 重启成功"
+        else
+            LOGE "${1} 重启失败，可能启动超过 2 秒，请稍后查看日志。"
+        fi
     fi
     if [[ $# == 1 ]]; then
         before_show_menu
@@ -269,18 +299,32 @@ restart() {
 }
 
 status() {
-    systemctl status s-ui -l
+    if [ $is_freebsd -eq 1 ]; then
+        if pgrep -f "${INSTALL_DIR}/sui" > /dev/null; then
+            pid=$(pgrep -f "${INSTALL_DIR}/sui")
+            LOGI "s-ui 状态：运行中 (PID: $pid)"
+        else
+            LOGE "s-ui 状态：未运行"
+        fi
+    else
+        systemctl status s-ui -l
+    fi
     if [[ $# == 0 ]]; then
         before_show_menu
     fi
 }
 
 enable() {
-    systemctl enable $1
-    if [[ $? == 0 ]]; then
-        LOGI "已设置 ${1} 开机自启"
+    if [ $is_freebsd -eq 1 ]; then
+        (crontab -l 2>/dev/null; echo "* * * * * ${INSTALL_DIR}/cron.sh >/dev/null 2>&1") | sort -u | crontab -
+        LOGI "已设置 S-UI 在 Crontab 中每分钟保活及开机自动拉起"
     else
-        LOGE "设置 ${1} 开机自启失败"
+        systemctl enable $1
+        if [[ $? == 0 ]]; then
+            LOGI "已设置 ${1} 开机自启"
+        else
+            LOGE "设置 ${1} 开机自启失败"
+        fi
     fi
 
     if [[ $# == 1 ]]; then
@@ -289,11 +333,16 @@ enable() {
 }
 
 disable() {
-    systemctl disable $1
-    if [[ $? == 0 ]]; then
-        LOGI "已取消 ${1} 开机自启"
+    if [ $is_freebsd -eq 1 ]; then
+        crontab -l 2>/dev/null | grep -v "s-ui/cron.sh" | crontab -
+        LOGI "已在 Crontab 中注销保活任务"
     else
-        LOGE "取消 ${1} 开机自启失败"
+        systemctl disable $1
+        if [[ $? == 0 ]]; then
+            LOGI "已取消 ${1} 开机自启"
+        else
+            LOGE "取消 ${1} 开机自启失败"
+        fi
     fi
 
     if [[ $# == 1 ]]; then
@@ -302,25 +351,36 @@ disable() {
 }
 
 show_log() {
-    journalctl -u $1.service -e --no-pager -f
+    if [ $is_freebsd -eq 1 ]; then
+        tail -f -n 100 "${INSTALL_DIR}/sui.log"
+    else
+        journalctl -u $1.service -e --no-pager -f
+    fi
     if [[ $# == 1 ]]; then
         before_show_menu
     fi
 }
 
 update_shell() {
-    wget -O /usr/bin/s-ui -N --no-check-certificate "$(gh_url "https://raw.githubusercontent.com/hxzlplp7/s-ui/main/s-ui.sh")"
+    wget -O ${BIN_DIR}/s-ui -N --no-check-certificate "$(gh_url "https://raw.githubusercontent.com/hxzlplp7/s-ui/main/s-ui.sh")"
     if [[ $? != 0 ]]; then
         echo ""
         LOGE "下载脚本失败，请检查机器是否可访问 GitHub。"
         before_show_menu
     else
-        chmod +x /usr/bin/s-ui
+        chmod +x ${BIN_DIR}/s-ui
         LOGI "升级脚本成功，请重新运行脚本。" && exit 0
     fi
 }
 
 check_status() {
+    if [ $is_freebsd -eq 1 ]; then
+        if pgrep -f "${INSTALL_DIR}/sui" > /dev/null; then
+            return 0
+        else
+            return 1
+        fi
+    fi
     if [[ ! -f "/etc/systemd/system/$1.service" ]]; then
         return 2
     fi
@@ -333,6 +393,13 @@ check_status() {
 }
 
 check_enabled() {
+    if [ $is_freebsd -eq 1 ]; then
+        if crontab -l 2>/dev/null | grep -q "s-ui/cron.sh"; then
+            return 0
+        else
+            return 1
+        fi
+    fi
     temp=$(systemctl is-enabled $1)
     if [[ x"${temp}" == x"enabled" ]]; then
         return 0
