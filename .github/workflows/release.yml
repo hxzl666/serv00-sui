@@ -125,3 +125,68 @@ jobs:
           asset_name: s-ui-linux-${{ matrix.platform }}.tar.gz
           prerelease: true
           overwrite: true
+
+  build-freebsd:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          cache: false
+          go-version-file: go.mod
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm install
+          npm run build
+          cd ..
+          mv frontend/dist web/html
+          rm -fr frontend
+
+      - name: Build s-ui
+        run: |
+          export CGO_ENABLED=0
+          export GOOS=freebsd
+          export GOARCH=amd64
+          go build -ldflags "-w -s" -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor" -o sui main.go
+          
+          mkdir s-ui
+          cp sui s-ui/
+          cp s-ui.sh s-ui/
+
+      - name: Package
+        run: tar -zcvf s-ui-freebsd-amd64.tar.gz s-ui
+
+      - name: Upload files to Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: s-ui-freebsd-amd64
+          path: ./s-ui-freebsd-amd64.tar.gz
+          retention-days: 30
+
+      - name: Upload to Release
+        uses: svenstaro/upload-release-action@v2
+        if: |
+          (github.event_name == 'release' && github.event.action == 'published') ||
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref }}
+          file: s-ui-freebsd-amd64.tar.gz
+          asset_name: s-ui-freebsd-amd64.tar.gz
+          prerelease: true
+          overwrite: true
+

@@ -106,44 +106,68 @@ prepare_sui_binary() {
     mkdir -p "${INSTALL_DIR}"
     
     if [ $is_freebsd -eq 1 ]; then
-        # FreeBSD 环境下需要现场编译或者使用已有的源码编译
-        echo -e "${yellow}正在准备 FreeBSD 版 sui 编译环境...${plain}"
-        
-        # 检查当前目录下是否有源码
-        if [[ ! -f "main.go" || ! -d "web/html" ]]; then
-            echo -e "${red}错误：未能在当前目录检测到 s-ui Go 源码或前端静态网页(web/html)。${plain}"
-            echo -e "请在本地先运行 ${green}npm run build${plain} 编译前端，然后将整个项目源码上传至服务器再运行安装。"
-            exit 1
+        echo -e "${yellow}检测到 FreeBSD 环境，正在尝试获取预编译发布包...${plain}"
+        local last_version
+        if [ $# == 0 ] || [ -z "$1" ]; then
+            last_version=$(curl -Ls "https://api.github.com/repos/hxzl666/serv00-sui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+            if [ -z "$last_version" ]; then
+                last_version="latest"
+            fi
+            url="https://github.com/hxzl666/serv00-sui/releases/latest/download/s-ui-freebsd-amd64.tar.gz"
+        else
+            last_version=$1
+            url="https://github.com/hxzl666/serv00-sui/releases/download/${last_version}/s-ui-freebsd-amd64.tar.gz"
         fi
         
-        # 检查是否有 Go 环境
-        temp_go_installed=0
-        if ! command -v go &>/dev/null; then
-            echo -e "${yellow}未检测到系统安装了 Go，正在下载临时 Go 编译器进行现场构建...${plain}"
-            wget -N --no-check-certificate -O /tmp/go-freebsd.tar.gz https://go.dev/dl/go1.22.2.freebsd-amd64.tar.gz
-            if [ $? -ne 0 ]; then
-                echo -e "${red}下载 Go 编译器失败，请检查网络。${plain}"
+        echo -e "正在尝试从发布页面下载: ${url}"
+        wget -q -N --no-check-certificate -O /tmp/s-ui-freebsd.tar.gz ${url}
+        if [ $? -eq 0 ] && [ -f /tmp/s-ui-freebsd.tar.gz ]; then
+            echo -e "${green}成功获取预编译 FreeBSD 包，正在解压安装...${plain}"
+            cd /tmp/
+            tar -zxf s-ui-freebsd.tar.gz
+            rm -f s-ui-freebsd.tar.gz
+            cp -rf s-ui/* "${INSTALL_DIR}/"
+            rm -rf s-ui
+            cd "${cur_dir}"
+        else
+            echo -e "${yellow}未能从 Release 下载预编译包（可能暂未发布 Release 版），将自动回退到现场编译模式...${plain}"
+            
+            # 检查当前目录下是否有源码
+            if [[ ! -f "main.go" || ! -d "web/html" ]]; then
+                echo -e "${red}致命错误：当前目录未检测到源码，且未能从 GitHub 下载预编译包。${plain}"
+                echo -e "请在此项目发布 Release 后再运行本一键命令，或上传完整源码至此目录。"
                 exit 1
             fi
-            tar -C /tmp/ -zxf /tmp/go-freebsd.tar.gz
-            export PATH="/tmp/go/bin:$PATH"
-            temp_go_installed=1
-        fi
-        
-        echo -e "${yellow}正在编译 s-ui 后端二进制 (freebsd-amd64)...${plain}"
-        go build -ldflags "-w -s" -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor" -o sui main.go
-        if [ $? -ne 0 ]; then
-            echo -e "${red}编译 s-ui 失败！请检查 Go 源码或环境。${plain}"
+            
+            # 检查是否有 Go 环境
+            temp_go_installed=0
+            if ! command -v go &>/dev/null; then
+                echo -e "${yellow}未检测到系统安装了 Go，正在下载临时 Go 编译器进行现场构建...${plain}"
+                wget -N --no-check-certificate -O /tmp/go-freebsd.tar.gz https://go.dev/dl/go1.22.2.freebsd-amd64.tar.gz
+                if [ $? -ne 0 ]; then
+                    echo -e "${red}下载 Go 编译器失败，请检查网络。${plain}"
+                    exit 1
+                fi
+                tar -C /tmp/ -zxf /tmp/go-freebsd.tar.gz
+                export PATH="/tmp/go/bin:$PATH"
+                temp_go_installed=1
+            fi
+            
+            echo -e "${yellow}正在编译 s-ui 后端二进制 (freebsd-amd64)...${plain}"
+            go build -ldflags "-w -s" -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor" -o sui main.go
+            if [ $? -ne 0 ]; then
+                echo -e "${red}编译 s-ui 失败！请检查 Go 源码或环境。${plain}"
+                # 清理临时 go
+                [ $temp_go_installed -eq 1 ] && rm -rf /tmp/go
+                exit 1
+            fi
+            
+            # 移至安装目录
+            mv -f sui "${INSTALL_DIR}/sui"
+            
             # 清理临时 go
             [ $temp_go_installed -eq 1 ] && rm -rf /tmp/go
-            exit 1
         fi
-        
-        # 移至安装目录
-        mv -f sui "${INSTALL_DIR}/sui"
-        
-        # 清理临时 go
-        [ $temp_go_installed -eq 1 ] && rm -rf /tmp/go
     else
         # Linux 环境直接下载官方预编译包
         echo -e "${yellow}正在下载 Linux 版 s-ui 二进制发行包...${plain}"
