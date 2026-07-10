@@ -158,6 +158,16 @@ jobs:
 
       - name: Build s-ui
         run: |
+          go mod download
+          tailscale_dir=$(go env GOPATH)/pkg/mod/github.com/sagernet/tailscale@*
+          chmod -R +w "$tailscale_dir" 2>/dev/null || true
+          router_file=$(find "$tailscale_dir" -name "router_freebsd.go" | head -n 1)
+          if [ -n "$router_file" ] && [ -f "$router_file" ]; then
+            echo "Found tailscale freebsd router file at: $router_file"
+            sed -i 's|"github.com/sagernet/wireguard-go/tun"|// "github.com/sagernet/wireguard-go/tun"|g' "$router_file"
+            echo "Successfully patched tailscale FreeBSD unused import."
+          fi
+          
           export CGO_ENABLED=0
           export GOOS=freebsd
           export GOARCH=amd64
@@ -166,6 +176,7 @@ jobs:
           mkdir s-ui
           cp sui s-ui/
           cp s-ui.sh s-ui/
+
 
       - name: Package
         run: tar -zcvf s-ui-freebsd-amd64.tar.gz s-ui
