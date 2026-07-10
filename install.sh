@@ -155,13 +155,14 @@ prepare_sui_binary() {
             
             echo -e "${yellow}正在编译 s-ui 后端二进制 (freebsd-amd64)...${plain}"
             go mod download
-            tailscale_dir=$(go env GOPATH)/pkg/mod/github.com/sagernet/tailscale@*
-            chmod -R +w "$tailscale_dir" 2>/dev/null || true
-            router_file=$(find "$tailscale_dir" -name "router_freebsd.go" | head -n 1)
+            gopath=$(go env GOPATH)
+            router_file=$(find "$gopath/pkg/mod/github.com/sagernet" -name "router_freebsd.go" | head -n 1)
             if [ -n "$router_file" ] && [ -f "$router_file" ]; then
+                chmod +w "$router_file"
                 sed -i '' 's|"github.com/sagernet/wireguard-go/tun"|// "github.com/sagernet/wireguard-go/tun"|g' "$router_file" 2>/dev/null || \
                 sed -i 's|"github.com/sagernet/wireguard-go/tun"|// "github.com/sagernet/wireguard-go/tun"|g' "$router_file"
             fi
+            
             
             go build -ldflags "-w -s" -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor" -o sui main.go
             if [ $? -ne 0 ]; then
