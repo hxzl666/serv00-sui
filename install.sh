@@ -158,7 +158,7 @@ prepare_sui_binary() {
             gopath=$(go env GOPATH)
             router_file=$(find "$gopath/pkg/mod/github.com/sagernet" -name "router_freebsd.go" | head -n 1)
             if [ -n "$router_file" ] && [ -f "$router_file" ]; then
-                chmod +w "$router_file"
+                chmod +w "$(dirname "$router_file")" "$router_file"
                 sed -i '' 's|"github.com/sagernet/wireguard-go/tun"|// "github.com/sagernet/wireguard-go/tun"|g' "$router_file" 2>/dev/null || \
                 sed -i 's|"github.com/sagernet/wireguard-go/tun"|// "github.com/sagernet/wireguard-go/tun"|g' "$router_file"
             fi
